@@ -1,5 +1,6 @@
 defmodule Dataloader.KV do
   require Logger
+
   @moduledoc """
   Simple KV based Dataloader source.
 
@@ -69,7 +70,7 @@ defmodule Dataloader.KV do
       %{source | results: results}
     end
 
-    def load(source, _, nil) do 
+    def load(source, _, nil) do
       source
     end
 
@@ -85,7 +86,7 @@ defmodule Dataloader.KV do
       end
     end
 
-    def load_many(source, _, ids) when ids in [nil, []] do 
+    def load_many(source, _, ids) when ids in [nil, []] do
       source
     end
 
@@ -99,6 +100,7 @@ defmodule Dataloader.KV do
 
         idms = MapSet.new(ids)
         to_load = MapSet.difference(idms, existing)
+
         if MapSet.size(to_load) == 0 do
           source
         else
@@ -121,9 +123,10 @@ defmodule Dataloader.KV do
 
     def fetch(source, batch_key, id) do
       with {:ok, batch} <- Map.fetch(source.results, batch_key) do
-        case Map.get(batch, id) do
-          {:error, reason} -> {:error, reason}
-          item -> {:ok, item}
+        case Map.fetch(batch, id) do
+          :error -> {:error, :not_found}
+          {:ok, {:error, reason}} -> {:error, reason}
+          {:ok, item} -> {:ok, item}
         end
       else
         :error ->
@@ -152,20 +155,23 @@ defmodule Dataloader.KV do
     end
 
     defp do_fetch_many(_, _, []), do: {:ok, []}
+
     defp do_fetch_many(source, batch_key, ids) do
       do_fetch_many(source, batch_key, ids, {:ok, []})
     end
 
     defp do_fetch_many(_, _, [], {:ok, results}), do: {:ok, Enum.reverse(results)}
+
     defp do_fetch_many(_, _, _, {:error, _} = err) do
       err
     end
 
     defp do_fetch_many(source, batch_key, [id | rest], {:ok, results}) do
       case fetch(source, batch_key, id) do
-        {:error, _} = err -> 
+        {:error, _} = err ->
           err
-        {:ok, item} -> 
+
+        {:ok, item} ->
           do_fetch_many(source, batch_key, rest, {:ok, [item | results]})
       end
     end
